@@ -40,7 +40,7 @@ class World {
 abstract class AI {
 
    /** The possible actions for the AI. */
-   actions = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+   abstract actions: Readonly<string[]>;
 
    /** The world in which the AI operates. */
    world: World;
@@ -77,14 +77,25 @@ abstract class AI {
    }
 
    /**
+    * Chooses an action based on the current state.
+    * @returns The chosen action.
+    */
+   abstract chooseAction(): string;
+
+   /**
     * Updates the AI's position based on the given action.
     * @param action - The action to take.
     * @returns The new position.
     */
-   abstract updatePosition(action: string): Position;
+   abstract commitAction(action: string): Position;
 }
 
+/**
+ * An AI that uses Q-learning to learn the optimal path to the goal.
+ */
 class QLearningAI extends AI {
+
+   actions = ['UP', 'DOWN', 'LEFT', 'RIGHT'] as const;
 
    /** The Q-table mapping state-action pairs to Q-values. */
    qTable: { [key: string]: number } = {};
