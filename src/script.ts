@@ -46,7 +46,7 @@ abstract class AI {
    world: World;
 
    /** The position of the AI. */
-   pos: Position;
+   position: Position;
 
    constructor(world: World, options: {
       explorationRate: number;
@@ -54,7 +54,7 @@ abstract class AI {
       discountFactor: number;
    }) {
       this.world = world;
-      this.pos = { ...world.spawn };
+      this.position = { ...world.spawn };
    }
 
    /**
@@ -62,7 +62,7 @@ abstract class AI {
     * @returns The Manhattan distance.
     */
    manhattanDistanceToGoal() {
-      return Math.abs(this.pos.x - this.world.goal.x) + Math.abs(this.pos.y - this.world.goal.y);
+      return Math.abs(this.position.x - this.world.goal.x) + Math.abs(this.position.y - this.world.goal.y);
    }
 
    /**
@@ -71,8 +71,8 @@ abstract class AI {
     * @returns The Euclidean distance.
     */
    euclideanDistanceToGoal(fast: boolean = false) {
-      const dx = this.pos.x - this.world.goal.x;
-      const dy = this.pos.y - this.world.goal.y;
+      const dx = this.position.x - this.world.goal.x;
+      const dy = this.position.y - this.world.goal.y;
       return fast ? dx * dx + dy * dy : Math.sqrt(dx * dx + dy * dy);
    }
 
@@ -83,11 +83,16 @@ abstract class AI {
    abstract chooseAction(): string;
 
    /**
-    * Updates the AI's position based on the given action.
+    * Updates the AI's data based on the chosen action.
     * @param action - The action to take.
     * @returns The new position.
     */
    abstract commitAction(action: string): Position;
+
+   /**
+    * Learns from taking an action and receiving a reward.
+    */
+   abstract learn(): { action: string, reward: number };
 }
 
 /**
