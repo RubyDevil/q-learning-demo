@@ -163,7 +163,7 @@ abstract class AI {
     * @param episodes - The number of episodes to run.
     * @param decisionInterval - The interval between decisions in milliseconds.
     */
-   abstract train(episodes: number, decisionInterval: number, spawnPointGenerator: () => Position): Promise<number>;
+   abstract train(episodes: number, decisionInterval: number, spawnPointGenerator: () => Position, episodeCompletionCallback: (episode: Episode) => any): Promise<number>;
 }
 
 /**
@@ -273,7 +273,7 @@ class QLearningAI extends AI {
     * @param spawnPointGenerator - A function that generates a spawn point for each episode.
     * @returns The elapsed time in milliseconds.
     */
-   async train(episodes: number, decisionInterval: number, spawnPointGenerator: () => Position): Promise<number> {
+   async train(episodes: number, decisionInterval: number, spawnPointGenerator: () => Position, episodeCompletionCallback: (episode: Episode) => any): Promise<number> {
       return new Promise(async resolve => {
          // Save the start time
          const startTime = Date.now();
@@ -289,6 +289,9 @@ class QLearningAI extends AI {
 
             // Add the episode to the memory
             this.episodes.push(episode);
+
+            // Call the episode completion callback
+            episodeCompletionCallback(episode);
          }
 
          // Resolve the promise with the elapsed time
@@ -353,8 +356,6 @@ const ai = new QLearningAI(world, {
 
 world.addAI(ai);
 
-ai.train(1000, 1, staticSpawnGenerator({ x: 0, y: 0 }));
-
 function staticSpawnGenerator(position: Position) {
    return () => position;
 }
@@ -368,31 +369,91 @@ function randomSpawnGenerator() {
 
 // ========== UI =================================
 
-// Get the stats elements
+// Get the training stats
 const stats = document.getElementById('stats')!;
 const episodes = document.getElementById('stat-episodes')!;
 const totalDecisions = document.getElementById('stat-total-decisions')!;
 const averageDecisions = document.getElementById('stat-average-decisions')!;
 const lastDecisions = document.getElementById('stat-last-decisions')!;
 
+// Get the training params
+const episodesInput = document.getElementsByTagName('input').namedItem('param-episodes')!;
+const decisionIntervalInput = document.getElementsByTagName('input').namedItem('param-decision-interval')!;
+const explorationRateInput = document.getElementsByTagName('input').namedItem('param-exploration-rate')!;
+const learningRateInput = document.getElementsByTagName('input').namedItem('param-learning-rate')!;
+const discountFactorInput = document.getElementsByTagName('input').namedItem('param-discount-factor')!;
+
 // Get the training controls
-const startButton = document.getElementById('start-button')!;
-const cancelButton = document.getElementById('cancel-button')!;
-const episodesInput = document.getElementById('episodes-input') as HTMLInputElement;
+const startButton = document.getElementsByTagName('button').namedItem('control-start')!;
+const cancelButton = document.getElementsByTagName('button').namedItem('control-cancel')!;
+const resetButton = document.getElementsByTagName('button').namedItem('control-reset')!;
+
+// Add event listeners
+startButton.addEventListener('click', startTraining);
+cancelButton.addEventListener('click', stopTraining);
+resetButton.addEventListener('click', resetTraining);
+
+let training = false;
+let task: { run: () => Promise<any>, cancel: () => void } | null = null;
 
 function startTraining() {
-   console.log('Training started.');
-   const episodes = parseInt((document.getElementById('episodes-input') as HTMLInputElement).value);
-   const interval = parseInt((document.getElementById('interval-input') as HTMLInputElement).value);
-   ai.train(episodes, interval, randomSpawnGenerator());
+   if (!training) {
+      // Set the training flag
+      training = true;
+      // Create a cancellable task to run the training
+      task = buildCancellableTask(() => ai.train(
+         parseInt(episodesInput.value),
+         parseInt(decisionIntervalInput.value),
+         randomSpawnGenerator(),
+         updateUI
+      ));
+      // Run the task and handle the result
+      task.run().then(elapsedTime => {
+         // Stop the training
+         stopTraining();
+         // Log the elapsed time
+         console.log(`Training completed in ${elapsedTime}ms`);
+      }).catch(error => {
+         // Stop the training
+         stopTraining();
+         // Log the error
+         if (error.message !== 'CanceledError')
+            console.error(error);
+      });
+   }
 }
 
-function cancelTraining() {
-   console.log('Training canceled.');
+function stopTraining() {
+   if (training && task)
+      task.cancel();
 }
 
 function resetTraining() {
-   console.log('Training reset.');
+   ai.qTable = {};
+   ai.episodes = [];
+   updateUI();
+}
+
+function updateUI() {
+   // Update the training stats
+   episodes.textContent = ai.episodes.length.toString();
+   totalDecisions.textContent = ai.episodes.reduce((sum, e) => sum + e.decisions.length, 0).toString();
+   averageDecisions.textContent = ai.episodes.length > 0
+      ? (ai.episodes.reduce((sum, e) => sum + e.decisions.length, 0) / ai.episodes.length).toFixed(2)
+      : 'N/A';
+   lastDecisions.textContent = ai.episodes.length > 0 ? ai.episodes[ai.episodes.length - 1].decisions.length.toString() : 'N/A';
+
+   // Update the training params
+   episodesInput.disabled = training;
+   decisionIntervalInput.disabled = training;
+   explorationRateInput.disabled = training;
+   learningRateInput.disabled = training;
+   discountFactorInput.disabled = training;
+
+   // Update the training controls
+   startButton.disabled = training;
+   cancelButton.disabled = !training;
+   resetButton.disabled = training;
 }
 
 // ========== Rendering =========================
@@ -404,14 +465,6 @@ const ctx = canvas.getContext('2d')!;
 const render = () => {
    // Render the world
    world.render(ctx, 0, 0, canvas.width, canvas.height);
-
-   // Update the stats
-   episodes.textContent = ai.episodes.length.toString();
-   totalDecisions.textContent = ai.episodes.reduce((sum, e) => sum + e.decisions.length, 0).toString();
-   averageDecisions.textContent = ai.episodes.length > 0
-      ? (ai.episodes.reduce((sum, e) => sum + e.decisions.length, 0) / ai.episodes.length).toFixed(2)
-      : 'N/A';
-   lastDecisions.textContent = ai.episodes.length > 0 ? ai.episodes[ai.episodes.length - 1].decisions.length.toString() : 'N/A';
 
    // Request the next frame
    requestAnimationFrame(render);
