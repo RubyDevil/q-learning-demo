@@ -119,11 +119,11 @@ Decisions:
          <div id="params">
             <span>
                <label for="param-episodes">Episodes:</label>
-               <input type="number" id="param-episodes" value="1000" step="100" min="100" max="100000">
+               <input type="number" id="param-episodes" value="10" step="1" min="1" max="1000">
             </span>
             <span>
                <label for="param-episodes">Decision Interval:</label>
-               <input type="number" id="param-decision-interval" value="100" step="10" min="10" max="1000">
+               <input type="number" id="param-decision-interval" value="50" step="10" min="10" max="1000">
             </span>
             <span>
                <label for="param-learning-rate">Exploration Rate:</label>
@@ -152,12 +152,11 @@ Decisions:
          </div>
          <div id="controls">
             <button id="control-start">Start</button>
-            <button id="control-cancel">Cancel</button>
             <button id="control-reset">Reset</button>
          </div>
          <div id="loaders">
-            <button disabled>Download Model</button>
-            <button>Load Model</button>
+            <button id="loader-download" disabled>Download Model</button>
+            <button id="loader-load">Load Model</button>
          </div>
       </div>
    </div>

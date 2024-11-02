@@ -271,13 +271,12 @@ class QLearningAI extends AI {
     * @param episodes - The number of episodes to run.
     * @param decisionInterval - The interval between decisions in milliseconds.
     * @param spawnPointGenerator - A function that generates a spawn point for each episode.
-    * @returns The elapsed time in milliseconds.
+    * @returns
     */
-   async train(episodes: number, decisionInterval: number, spawnPointGenerator: () => Position, episodeCompletionCallback: (episode: Episode) => any): Promise<number> {
-      return new Promise(async resolve => {
+   async train(episodes: number, decisionInterval: number, spawnPointGenerator: () => Position, episodeCompletionCallback: (episode: Episode) => any) {
+      return await new Promise<number>(async resolve => {
          // Save the start time
          const startTime = Date.now();
-
          // Run the specified number of episodes
          for (let i = 0; i < episodes; i++) {
             // Reset the AI's position and spawn point
@@ -385,53 +384,72 @@ const discountFactorInput = document.getElementsByTagName('input').namedItem('pa
 
 // Get the training controls
 const startButton = document.getElementsByTagName('button').namedItem('control-start')!;
-const cancelButton = document.getElementsByTagName('button').namedItem('control-cancel')!;
 const resetButton = document.getElementsByTagName('button').namedItem('control-reset')!;
+
+// Get the training loaders
+const loadButton = document.getElementsByTagName('button').namedItem('control-load')!;
+const downloadButton = document.getElementsByTagName('button').namedItem('control-download')!;
 
 // Add event listeners
 startButton.addEventListener('click', startTraining);
-cancelButton.addEventListener('click', stopTraining);
 resetButton.addEventListener('click', resetTraining);
 
 let training = false;
 let task: { run: () => Promise<any>, cancel: () => void } | null = null;
 
 function startTraining() {
+   const episodes = parseInt(episodesInput.value);
+   const decisionInterval = parseInt(decisionIntervalInput.value);
+   const explorationRate = parseFloat(explorationRateInput.value);
+   const learningRate = parseFloat(learningRateInput.value);
+   const discountFactor = parseFloat(discountFactorInput.value);
+
+   if (isNaN(episodes) || isNaN(decisionInterval) || isNaN(explorationRate) || isNaN(learningRate) || isNaN(discountFactor))
+      return alert('Please enter valid training parameters');
+
    if (!training) {
       // Set the training flag
       training = true;
-      // Create a cancellable task to run the training
-      task = buildCancellableTask(() => ai.train(
-         parseInt(episodesInput.value),
-         parseInt(decisionIntervalInput.value),
-         randomSpawnGenerator(),
+      // Update the UI
+      updateUI();
+      // Run the training task
+      ai.train(
+         episodes,
+         decisionInterval,
+         staticSpawnGenerator({ x: 0, y: 0 }),
          updateUI
-      ));
-      // Run the task and handle the result
-      task.run().then(elapsedTime => {
-         // Stop the training
-         stopTraining();
+      ).then(elapsedTime => {
+         // Reset the training flag
+         training = false;
+         // Update the UI
+         updateUI();
          // Log the elapsed time
          console.log(`Training completed in ${elapsedTime}ms`);
+         alert(`Training completed in ${elapsedTime}ms`);
       }).catch(error => {
-         // Stop the training
-         stopTraining();
+         // Reset the training flag
+         training = false;
+         // Update the UI
+         updateUI();
          // Log the error
-         if (error.message !== 'CanceledError')
-            console.error(error);
+         console.error(error);
       });
    }
 }
 
-function stopTraining() {
-   if (training && task)
-      task.cancel();
-}
-
 function resetTraining() {
+   // Reset the training data
    ai.qTable = {};
    ai.episodes = [];
+   // Set the default values
+   episodesInput.value = '10';
+   decisionIntervalInput.value = '50';
+   explorationRateInput.value = '0.2';
+   learningRateInput.value = '0.1';
+   discountFactorInput.value = '0.9';
+   // Update the UI
    updateUI();
+   alert('Training data has been reset');
 }
 
 function updateUI() {
@@ -452,8 +470,9 @@ function updateUI() {
 
    // Update the training controls
    startButton.disabled = training;
-   cancelButton.disabled = !training;
    resetButton.disabled = training;
+
+   // Update the loaders
 }
 
 // ========== Rendering =========================
@@ -471,23 +490,3 @@ const render = () => {
 };
 
 requestAnimationFrame(render);
-
-// ========== Utils ==============================
-
-function buildCancellableTask<T>(asyncFn: () => Promise<T>) {
-   let rejected = false;
-   const { promise, resolve, reject } = Promise.withResolvers<T>()
-
-   return {
-      run: () => {
-         if (!rejected) {
-            asyncFn().then(resolve, reject);
-         }
-         return promise;
-      },
-      cancel: () => {
-         rejected = true;
-         reject(new Error('CanceledError'));
-      },
-   };
-};
