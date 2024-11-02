@@ -418,3 +418,23 @@ const render = () => {
 };
 
 requestAnimationFrame(render);
+
+// ========== Utils ==============================
+
+function buildCancellableTask<T>(asyncFn: () => Promise<T>) {
+   let rejected = false;
+   const { promise, resolve, reject } = Promise.withResolvers<T>()
+
+   return {
+      run: () => {
+         if (!rejected) {
+            asyncFn().then(resolve, reject);
+         }
+         return promise;
+      },
+      cancel: () => {
+         rejected = true;
+         reject(new Error('CanceledError'));
+      },
+   };
+};
